@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -37,6 +38,16 @@ func main() {
 	}
 
 	log.Printf("Found  %s by %s \n", found.Author, found.Title)
+
+	books, err := newBookStore.List()
+
+	if err != nil {
+		log.Fatal("list: ", err)
+	}
+	fmt.Println("Total books:", len(books))
+	for _, b := range books {
+		fmt.Printf("  #%d %s by %s\n", b.Id, b.Title, b.Author)
+	}
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

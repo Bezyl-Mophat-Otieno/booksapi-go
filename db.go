@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -84,5 +85,26 @@ func (s *BookStore) GetById(Id int64) (Book, error) {
 		return Book{}, ErrNotFound
 	}
 	return b, nil
+
+}
+
+func (s *BookStore) List() ([]Book, error) {
+	rows, err := s.db.Query(`SELECT title, author, pages, created_at, updated_at FROM books`)
+	if err != nil {
+		log.Fatal("List ", err)
+	}
+	defer rows.Close()
+	books := []Book{}
+
+	for rows.Next() {
+		var b Book
+		if err := rows.Scan(&b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, err
+
+		}
+		books = append(books, b)
+	}
+
+	return books, rows.Err()
 
 }
