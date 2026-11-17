@@ -2,7 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 func openDB(path string) (*sql.DB, error) {
@@ -48,21 +51,38 @@ func NewBookStore(db *sql.DB) *BookStore {
 	return &BookStore{db: db}
 }
 
-func (s *BookStore) Create(b *Book) error{
-	now:= time.Now().UTC()
+func (s *BookStore) Create(b *Book) error {
+	now := time.Now().UTC()
 	b.CreatedAt = now
 	b.UpdatedAt = now
 	result, err := s.db.Exec(
-	`INSERT INTO (Title, Author, Pages, CreatedAt, UpdatedAt) 
-	VALUES(?,?,?,?,?)`, b.Title, b.Author, b.Pages, b.CreatedAt, b.UpdatedAt )
-	
+		`INSERT INTO books  (title, author, pages, created_at, updated_at) 
+	VALUES(?,?,?,?,?)`, b.Title, b.Author, b.Pages, b.CreatedAt, b.UpdatedAt)
+
 	if err != nil {
-		return  err
+		return err
 	}
 	id, err := result.LastInsertId()
-	if err !=nil {
+	if err != nil {
 		return err
 	}
 	b.Id = id
 	return err
+}
+
+var ErrNotFound = errors.New("book not found")
+
+func (s *BookStore) GetById(Id int64) (Book, error) {
+	var b Book
+
+	err := s.db.QueryRow(`
+	SELECT title, author, pages, created_at, updated_at
+	FROM books WHERE id=? 
+	`, Id).Scan(&b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return Book{}, ErrNotFound
+	}
+	return b, nil
+
 }
