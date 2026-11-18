@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 type BookHandler struct {
@@ -45,5 +48,92 @@ func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJson(w, http.StatusCreated, NewBookResponse(book))
+
+}
+func (h *BookHandler) Get(w http.ResponseWriter, r *http.Request) {
+	inputBookId := r.PathValue("bookId")
+	bookId, err := strconv.ParseInt(inputBookId, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid BookId")
+		return
+	}
+
+	found, err := h.store.GetById(bookId)
+
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Book Not Found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Could not fetch book")
+		return
+	}
+	writeJson(w, http.StatusFound, NewBookResponse(found))
+}
+func (h *BookHandler) ListBooks(w http.ResponseWriter, r *http.Request) {
+	books, err := h.store.List()
+	if err != nil {
+		log.Println("List Books", err)
+		writeError(w, http.StatusInternalServerError, "Could not fetch books")
+		return
+	}
+
+	writeJson(w, http.StatusOK, ToBooksResponses(books))
+
+}
+func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
+
+	var req CreateBookRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid Json Body")
+		return
+	}
+
+	inputBookId := r.PathValue("bookId")
+	bookId, err := strconv.ParseInt(inputBookId, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid BookId")
+		return
+	}
+
+	found, err := h.store.GetById(bookId)
+
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Book Not Found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Could not fetch book")
+		return
+	}
+
+	found.Author = req.Author
+	found.Title = req.Title
+	found.UpdatedAt = time.Now().UTC()
+
+	if err := h.store.Update(&found); err != nil {
+		log.Println("Update book", err)
+		writeError(w, http.StatusInternalServerError, "Could not Update book")
+		return
+	}
+
+	writeJson(w, http.StatusCreated, NewBookResponse(found))
+
+}
+func (h *BookHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	deleteBookId := r.PathValue("bookId")
+	bookId, err := strconv.ParseInt(deleteBookId, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid BookId")
+		return
+	}
+
+	err = h.store.Delete(bookId)
+
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Could not delete book")
+		return
+	}
+	writeJson(w, http.StatusOK, map[string]string{"message": "Book Deleted successfully"})
 
 }

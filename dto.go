@@ -12,6 +12,7 @@ type CreateBookRequest struct {
 	Pages  int64  `json:"pages"`
 }
 
+
 func (r CreateBookRequest) Validate() error {
 	if strings.TrimSpace(r.Title) == "" {
 		return errors.New("Title is required")
@@ -43,4 +44,12 @@ func NewBookResponse(b Book) BookResponse {
 		CreatedAt: b.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: b.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+func ToBooksResponses(books []Book) []BookResponse {
+	responses := make([]BookResponse, 0, len(books))
+	for _, b := range books {
+		responses = append(responses, NewBookResponse(b))
+	}
+	return responses
 }

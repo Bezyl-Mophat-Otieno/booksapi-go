@@ -28,6 +28,10 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /books", books.Create)
+	mux.HandleFunc("GET /books/{bookId}", books.Get)
+	mux.HandleFunc("DELETE /books/{bookId}", books.Delete)
+	mux.HandleFunc("PUT /books/{bookId}", books.Get)
+	mux.HandleFunc("GET /books", books.ListBooks)
 
 	log.Println("Server running on http://localhost:8080")
 

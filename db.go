@@ -75,11 +75,10 @@ var ErrNotFound = errors.New("book not found")
 
 func (s *BookStore) GetById(Id int64) (Book, error) {
 	var b Book
-
 	err := s.db.QueryRow(`
-	SELECT title, author, pages, created_at, updated_at
+	SELECT id, title, author, pages, created_at, updated_at
 	FROM books WHERE id=? 
-	`, Id).Scan(&b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt)
+	`, Id).Scan(&b.Id, &b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return Book{}, ErrNotFound
@@ -89,7 +88,7 @@ func (s *BookStore) GetById(Id int64) (Book, error) {
 }
 
 func (s *BookStore) List() ([]Book, error) {
-	rows, err := s.db.Query(`SELECT title, author, pages, created_at, updated_at FROM books`)
+	rows, err := s.db.Query(`SELECT id, title, author, pages, created_at, updated_at FROM books`)
 	if err != nil {
 		log.Fatal("List ", err)
 	}
@@ -98,7 +97,7 @@ func (s *BookStore) List() ([]Book, error) {
 
 	for rows.Next() {
 		var b Book
-		if err := rows.Scan(&b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 
 		}
