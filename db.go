@@ -108,3 +108,36 @@ func (s *BookStore) List() ([]Book, error) {
 	return books, rows.Err()
 
 }
+
+func checkFound(result sql.Result) error {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *BookStore) Update(b *Book) error {
+	now := time.Now().UTC()
+	b.UpdatedAt = now
+	result, err := s.db.Exec(
+		`UPDATE books SET title=?, author=?, pages=?, updated_at=? WHERE id=? `,
+		b.Title, b.Author, b.Pages, b.UpdatedAt, b.Id,
+	)
+	if err != nil {
+		return err
+	}
+	return checkFound(result)
+}
+
+func (s *BookStore) Delete(id int64) error {
+	result, err := s.db.Exec(`DELETE FROM books WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	return checkFound(result)
+}

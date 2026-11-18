@@ -49,6 +49,16 @@ func main() {
 		fmt.Printf("  #%d %s by %s\n", b.Id, b.Title, b.Author)
 	}
 
+	book.Title = "Arrow of God"
+	newBookStore.Update(&book)
+	log.Printf("Book Updated to  %s by %s on %v \n", book.Title, book.Author, book.UpdatedAt)
+
+	ghost := Book{Id: 99999, Title: "Ghost", Author: "Nobody"}
+	fmt.Println("Updating 99999:", newBookStore.Update(&ghost))
+
+	fmt.Println("Deleting book:", newBookStore.Delete(book.Id))
+	fmt.Println("Deleting again:", newBookStore.Delete(book.Id))
+
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
