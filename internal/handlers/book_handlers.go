@@ -36,6 +36,15 @@ func parseBookId(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return bookId, true
 }
 
+func writeBookError(w http.ResponseWriter, err error, action string) {
+	switch {
+	case errors.Is(err, store.BookNotFound):
+		writeError(w, http.StatusNotFound, "Book Not Found")
+	default:
+		log.Println(action, err)
+		writeError(w, http.StatusInternalServerError, "Could not "+action)
+	}
+}
 func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateBookRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -51,8 +60,8 @@ func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 	book := store.Book{Title: req.Title, Author: req.Author, Pages: req.Pages}
 
 	if err := h.store.Create(&book); err != nil {
-		log.Println("Save book", err)
-		writeError(w, http.StatusInternalServerError, "Could not save book")
+		log.Println("Create book", err)
+		writeBookError(w, err, "Create book")
 		return
 	}
 
@@ -67,13 +76,8 @@ func (h *BookHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	found, err := h.store.GetById(bookId)
-
-	if errors.Is(err, store.BookNotFound) {
-		writeError(w, http.StatusNotFound, "Book Not Found")
-		return
-	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Could not fetch book")
+		writeBookError(w, err, "Get book")
 		return
 	}
 	writeJson(w, http.StatusFound, NewBookResponse(found))
@@ -82,7 +86,7 @@ func (h *BookHandler) ListBooks(w http.ResponseWriter, r *http.Request) {
 	books, err := h.store.List()
 	if err != nil {
 		log.Println("List Books", err)
-		writeError(w, http.StatusInternalServerError, "Could not fetch books")
+		writeBookError(w, err, "List books")
 		return
 	}
 
@@ -104,13 +108,8 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	found, err := h.store.GetById(bookId)
-
-	if errors.Is(err, store.BookNotFound) {
-		writeError(w, http.StatusNotFound, "Book Not Found")
-		return
-	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Could not fetch book")
+		writeBookError(w, err, "Update book")
 		return
 	}
 
@@ -131,7 +130,7 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.Update(&found); err != nil {
 		log.Println("Update book", err)
-		writeError(w, http.StatusBadRequest, "Could not Update book")
+		writeBookError(w, err, "Update book")
 		return
 	}
 
