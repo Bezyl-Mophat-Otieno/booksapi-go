@@ -57,8 +57,6 @@ func orderExists(q queryRower, orderId int64) (bool, error) {
 	return exists, err
 }
 
-// Create records a transaction against an existing order.
-// Returns ErrOrderNotFound if the order does not exist.
 func (s *TransactionStore) Create(t *Transaction) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -103,8 +101,6 @@ func (s *TransactionStore) GetById(id int64) (Transaction, error) {
 	return t, nil
 }
 
-// List returns transactions newest first. If trackingId is not empty, only
-// transactions with that order_tracking_id are returned.
 func (s *TransactionStore) List(trackingId string) ([]Transaction, error) {
 	query := `SELECT ` + transactionColumns + ` FROM transactions`
 	args := []any{}
@@ -121,9 +117,6 @@ func (s *TransactionStore) List(trackingId string) ([]Transaction, error) {
 	return scanTransactions(rows)
 }
 
-// ListByOrder returns an order's transactions newest first.
-// Returns ErrOrderNotFound if the order does not exist, so callers can tell a
-// missing order apart from an order with no transactions yet.
 func (s *TransactionStore) ListByOrder(orderId int64) ([]Transaction, error) {
 	exists, err := orderExists(s.db, orderId)
 	if err != nil {
