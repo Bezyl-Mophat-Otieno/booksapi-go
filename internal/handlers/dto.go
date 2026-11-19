@@ -87,8 +87,6 @@ func ToBooksResponses(books []store.Book) []BookResponse {
 	return responses
 }
 
-// Stock
-
 type CreateStockRequest struct {
 	Quantity int64 `json:"quantity"`
 }
@@ -114,7 +112,6 @@ func (r UpdateStockRequest) Validate() error {
 	return nil
 }
 
-// AdjustStockRequest is used for both increasing and decreasing stock.
 type AdjustStockRequest struct {
 	Amount int64 `json:"amount"`
 }
@@ -159,8 +156,6 @@ type StockCheckResponse struct {
 	InStock   bool  `json:"in_stock"`
 }
 
-// Orders
-
 const maxOrderItems = 100
 
 type OrderItemRequest struct {
@@ -176,8 +171,6 @@ type CreateOrderRequest struct {
 	Items         []OrderItemRequest `json:"items"`
 }
 
-// phonePattern: optional leading +, then 7-15 digits (E.164 length), checked
-// after spaces, dashes and brackets have been removed by normalizePhone.
 var phonePattern = regexp.MustCompile(`^\+?[0-9]{7,15}$`)
 
 func normalizePhone(phone string) string {
@@ -193,7 +186,6 @@ func (r CreateOrderRequest) Validate() error {
 	if email == "" {
 		return errors.New("Customer email is required")
 	}
-	// ParseAddress also accepts "Name <a@b.com>", so require the bare address.
 	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
 		return errors.New("Customer email is not a valid email address")
 	}
@@ -227,8 +219,6 @@ func (r CreateOrderRequest) Validate() error {
 	return nil
 }
 
-// ToOrder converts a validated request into a store.Order, trimming the
-// customer details and normalizing the phone number.
 func (r CreateOrderRequest) ToOrder() store.Order {
 	items := make([]store.OrderItem, 0, len(r.Items))
 	for _, item := range r.Items {
@@ -278,7 +268,7 @@ type OrderResponse struct {
 	DispatchedAt  *string             `json:"dispatched_at"`
 	CancelledAt   *string             `json:"cancelled_at"`
 	UpdatedAt     string              `json:"updated_at"`
-	Items         []OrderItemResponse `json:"items,omitempty"` // omitted in list responses
+	Items         []OrderItemResponse `json:"items,omitempty"`
 }
 
 func formatOptionalTime(t *time.Time) *string {
@@ -332,4 +322,77 @@ type StockShortageResponse struct {
 	BookId    int64 `json:"book_id"`
 	Requested int64 `json:"requested"`
 	Available int64 `json:"available"`
+}
+
+type CreateTransactionRequest struct {
+	OrderTrackingID  string `json:"order_tracking_id"`
+	ConfirmationCode string `json:"confirmation_code"`
+	StatusCode       string `json:"status_code"`
+	PaymentMethod    string `json:"payment_method"`
+	AmountCents      int64  `json:"amount_cents"`
+	Currency         string `json:"currency"`
+}
+
+var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
+
+func (r CreateTransactionRequest) Validate() error {
+	if strings.TrimSpace(r.OrderTrackingID) == "" {
+		return errors.New("Order tracking id is required")
+	}
+	if strings.TrimSpace(r.StatusCode) == "" {
+		return errors.New("Status code is required")
+	}
+	if r.AmountCents < 0 {
+		return errors.New("Amount cannot be negative")
+	}
+	if !currencyPattern.MatchString(strings.ToUpper(strings.TrimSpace(r.Currency))) {
+		return errors.New("Currency must be a 3-letter code such as KES")
+	}
+	return nil
+}
+
+func (r CreateTransactionRequest) ToTransaction(orderId int64) store.Transaction {
+	return store.Transaction{
+		OrderID:          orderId,
+		OrderTrackingID:  strings.TrimSpace(r.OrderTrackingID),
+		ConfirmationCode: strings.TrimSpace(r.ConfirmationCode),
+		StatusCode:       strings.TrimSpace(r.StatusCode),
+		PaymentMethod:    strings.TrimSpace(r.PaymentMethod),
+		AmountCents:      r.AmountCents,
+		Currency:         strings.ToUpper(strings.TrimSpace(r.Currency)),
+	}
+}
+
+type TransactionResponse struct {
+	Id               int64  `json:"id"`
+	OrderID          int64  `json:"order_id"`
+	OrderTrackingID  string `json:"order_tracking_id"`
+	ConfirmationCode string `json:"confirmation_code"`
+	StatusCode       string `json:"status_code"`
+	PaymentMethod    string `json:"payment_method"`
+	AmountCents      int64  `json:"amount_cents"`
+	Currency         string `json:"currency"`
+	CreatedAt        string `json:"created_at"`
+}
+
+func NewTransactionResponse(t store.Transaction) TransactionResponse {
+	return TransactionResponse{
+		Id:               t.Id,
+		OrderID:          t.OrderID,
+		OrderTrackingID:  t.OrderTrackingID,
+		ConfirmationCode: t.ConfirmationCode,
+		StatusCode:       t.StatusCode,
+		PaymentMethod:    t.PaymentMethod,
+		AmountCents:      t.AmountCents,
+		Currency:         t.Currency,
+		CreatedAt:        t.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func ToTransactionResponses(transactions []store.Transaction) []TransactionResponse {
+	responses := make([]TransactionResponse, 0, len(transactions))
+	for _, t := range transactions {
+		responses = append(responses, NewTransactionResponse(t))
+	}
+	return responses
 }

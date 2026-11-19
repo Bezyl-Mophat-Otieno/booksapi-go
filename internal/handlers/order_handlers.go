@@ -65,8 +65,6 @@ func writeOrderError(w http.ResponseWriter, err error, action string) {
 	}
 }
 
-// Create places an order. No account is needed: the customer's details are
-// supplied with the order.
 func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -119,8 +117,6 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJson(w, http.StatusOK, ToOrderResponses(orders))
 }
 
-// UpdateStatus moves an order through its lifecycle. Moving to "dispatched"
-// reduces stock for every item in the order.
 func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	orderId, ok := parseOrderId(w, r)
 	if !ok {

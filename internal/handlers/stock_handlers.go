@@ -1,14 +1,14 @@
 package handlers
 
-
 import (
+	"booksapi/internal/store"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
-	"booksapi/internal/store"
 )
+
 type StockHandler struct {
 	store *store.StockStore
 }
@@ -16,7 +16,6 @@ type StockHandler struct {
 func NewStockHandler(store *store.StockStore) *StockHandler {
 	return &StockHandler{store: store}
 }
-
 
 func writeStockError(w http.ResponseWriter, err error, action string) {
 	switch {
@@ -142,7 +141,6 @@ func (h *StockHandler) adjust(w http.ResponseWriter, r *http.Request, op func(bo
 	writeJson(w, http.StatusOK, NewStockResponse(stock))
 }
 
-// Check reports whether ?quantity=N units of the book are available.
 func (h *StockHandler) Check(w http.ResponseWriter, r *http.Request) {
 	bookId, ok := parseBookId(w, r)
 	if !ok {

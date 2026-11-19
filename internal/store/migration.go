@@ -68,5 +68,26 @@ func Migrate(db *sql.DB) error {
 	}
 
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS transactions (
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			order_id         INTEGER  NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
+			order_tracking_id TEXT     NOT NULL,
+			confirmation_code TEXT     NOT NULL,
+			status_code       TEXT     NOT NULL,
+			payment_method    TEXT     NOT NULL,
+			amount_cents      INTEGER  NOT NULL CHECK (amount_cents >= 0),
+			currency          TEXT     NOT NULL,
+			created_at        DATETIME NOT NULL
+		)`)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
