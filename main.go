@@ -47,6 +47,14 @@ func main() {
 	mux.HandleFunc("GET /books/{bookId}/stock/check", stockHandler.Check)
 	mux.HandleFunc("GET /stocks", stockHandler.List)
 
+	orderStore := store.NewOrderStore(db)
+	orderHandler := handlers.NewOrderHandler(orderStore)
+
+	mux.HandleFunc("POST /orders", orderHandler.Create)
+	mux.HandleFunc("GET /orders", orderHandler.List)
+	mux.HandleFunc("GET /orders/{orderId}", orderHandler.Get)
+	mux.HandleFunc("PATCH /orders/{orderId}/status", orderHandler.UpdateStatus)
+
 	log.Println("Server running on http://localhost:8080")
 
 	log.Fatal(http.ListenAndServe(":8080", mux))

@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// Stock - The number of books in stock
-
 type Stock struct {
 	Id        int64
 	BookId    int64
@@ -43,8 +41,6 @@ func scanStock(row rowScanner) (Stock, error) {
 	return st, err
 }
 
-// Create adds a stock record for an existing book.
-// Returns BookNotFound if the book does not exist and ErrStockExists if it already has stock.
 func (s *StockStore) Create(st *Stock) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -86,14 +82,7 @@ func (s *StockStore) Create(st *Stock) error {
 }
 
 func (s *StockStore) GetByBookId(bookId int64) (Stock, error) {
-	st, err := scanStock(s.db.QueryRow(`SELECT `+stockColumns+` FROM stocks WHERE book_id = ?`, bookId))
-	if errors.Is(err, sql.ErrNoRows) {
-		return Stock{}, ErrStockNotFound
-	}
-	if err != nil {
-		return Stock{}, err
-	}
-	return st, nil
+	return getStock(s.db, bookId)
 }
 
 func (s *StockStore) List() ([]Stock, error) {
@@ -114,7 +103,6 @@ func (s *StockStore) List() ([]Stock, error) {
 	return stocks, rows.Err()
 }
 
-// SetQuantity overwrites the stock quantity for a book.
 func (s *StockStore) SetQuantity(bookId, quantity int64) (Stock, error) {
 	st, err := scanStock(s.db.QueryRow(
 		`UPDATE stocks SET quantity = ?, updated_at = ? WHERE book_id = ? RETURNING `+stockColumns,
@@ -129,7 +117,6 @@ func (s *StockStore) SetQuantity(bookId, quantity int64) (Stock, error) {
 	return st, nil
 }
 
-// Increase adds amount to the book's stock.
 func (s *StockStore) Increase(bookId, amount int64) (Stock, error) {
 	st, err := scanStock(s.db.QueryRow(
 		`UPDATE stocks SET quantity = quantity + ?, updated_at = ? WHERE book_id = ? RETURNING `+stockColumns,
@@ -148,14 +135,34 @@ func (s *StockStore) Increase(bookId, amount int64) (Stock, error) {
 // decrement happen in one statement, so concurrent callers cannot oversell.
 // Returns ErrInsufficientStock if fewer than amount units are available.
 func (s *StockStore) Decrease(bookId, amount int64) (Stock, error) {
-	st, err := scanStock(s.db.QueryRow(
+	return decreaseStock(s.db, bookId, amount)
+}
+
+// queryRower is satisfied by both *sql.DB and *sql.Tx, so stock helpers can run
+// standalone or as part of a larger transaction (e.g. dispatching an order).
+type queryRower interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func getStock(q queryRower, bookId int64) (Stock, error) {
+	st, err := scanStock(q.QueryRow(`SELECT `+stockColumns+` FROM stocks WHERE book_id = ?`, bookId))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Stock{}, ErrStockNotFound
+	}
+	if err != nil {
+		return Stock{}, err
+	}
+	return st, nil
+}
+
+func decreaseStock(q queryRower, bookId, amount int64) (Stock, error) {
+	st, err := scanStock(q.QueryRow(
 		`UPDATE stocks SET quantity = quantity - ?, updated_at = ?
 		 WHERE book_id = ? AND quantity >= ? RETURNING `+stockColumns,
 		amount, time.Now().UTC(), bookId, amount,
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		// No row matched: either there is no stock record, or not enough quantity.
-		if _, getErr := s.GetByBookId(bookId); getErr != nil {
+		if _, getErr := getStock(q, bookId); getErr != nil {
 			return Stock{}, getErr
 		}
 		return Stock{}, ErrInsufficientStock
@@ -166,8 +173,6 @@ func (s *StockStore) Decrease(bookId, amount int64) (Stock, error) {
 	return st, nil
 }
 
-// HasQuantity reports whether at least quantity units of the book are in stock,
-// along with the current stock record.
 func (s *StockStore) HasQuantity(bookId, quantity int64) (bool, Stock, error) {
 	st, err := s.GetByBookId(bookId)
 	if err != nil {

@@ -57,7 +57,7 @@ func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book := store.Book{Title: req.Title, Author: req.Author, Pages: req.Pages}
+	book := store.Book{Title: req.Title, Author: req.Author, Pages: req.Pages, PriceCents: req.PriceCents}
 
 	if err := h.store.Create(&book); err != nil {
 		log.Println("Create book", err)
@@ -126,6 +126,9 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Pages != nil {
 		found.Pages = *req.Pages
+	}
+	if req.PriceCents != nil {
+		found.PriceCents = *req.PriceCents
 	}
 
 	if err := h.store.Update(&found); err != nil {
