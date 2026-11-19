@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 type BookHandler struct {
@@ -83,7 +82,7 @@ func (h *BookHandler) ListBooks(w http.ResponseWriter, r *http.Request) {
 }
 func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 
-	var req CreateBookRequest
+	var req UpdateBookRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid Json Body")
 		return
@@ -107,17 +106,27 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	found.Author = req.Author
-	found.Title = req.Title
-	found.UpdatedAt = time.Now().UTC()
+	if err := req.Validate(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+	}
+
+	if req.Title != nil {
+		found.Title = *req.Title
+	}
+	if req.Author != nil {
+		found.Author = *req.Author
+	}
+	if req.Pages != nil {
+		found.Pages = *req.Pages
+	}
 
 	if err := h.store.Update(&found); err != nil {
 		log.Println("Update book", err)
-		writeError(w, http.StatusInternalServerError, "Could not Update book")
+		writeError(w, http.StatusBadRequest, "Could not Update book")
 		return
 	}
 
-	writeJson(w, http.StatusCreated, NewBookResponse(found))
+	writeJson(w, http.StatusOK, NewBookResponse(found))
 
 }
 func (h *BookHandler) Delete(w http.ResponseWriter, r *http.Request) {

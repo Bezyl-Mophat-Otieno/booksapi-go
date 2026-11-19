@@ -12,6 +12,25 @@ type CreateBookRequest struct {
 	Pages  int64  `json:"pages"`
 }
 
+type UpdateBookRequest struct {
+	Title  *string `json:"title"`
+	Author *string `json:"author"`
+	Pages  *int64  `json:"pages"`
+}
+
+func (u UpdateBookRequest) Validate() error {
+	if u.Title != nil && strings.TrimSpace(*u.Title) == "" {
+		return errors.New("Title is required")
+	}
+	if u.Author != nil && strings.TrimSpace(*u.Title) == "" {
+		return errors.New("Title is required")
+	}
+
+	if u.Pages != nil && *u.Pages < 0 {
+		return errors.New("Pages can not be negative")
+	}
+	return nil
+}
 
 func (r CreateBookRequest) Validate() error {
 	if strings.TrimSpace(r.Title) == "" {
