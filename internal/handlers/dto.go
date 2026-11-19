@@ -396,3 +396,8 @@ func ToTransactionResponses(transactions []store.Transaction) []TransactionRespo
 	}
 	return responses
 }
+
+type PesapalAuthTokenRequest struct {
+	ConsumerKey string `json:"consumer_key"`
+	SecretKey   string `json:"secret_key"`
+}

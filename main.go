@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	mux := http.NewServeMux()
+	_ = godotenv.Load()
 
 	db, err := store.Open("books.db")
 	if err != nil {
