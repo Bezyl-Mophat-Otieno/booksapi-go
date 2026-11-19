@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"database/sql"
@@ -9,9 +9,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func openDB(path string) (*sql.DB, error) {
+func Open(path string) (*sql.DB, error) {
 
-	db, err := sql.Open("sqlite", path)
+	// SQLite only enforces foreign keys when enabled per connection;
+	// the _pragma DSN param applies it to every pooled connection.
+	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, err
 	}
@@ -22,7 +24,7 @@ func openDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func migrate(db *sql.DB) error {
+func Migrate(db *sql.DB) error {
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS books (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,8 +34,21 @@ func migrate(db *sql.DB) error {
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS stocks (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			book_id    INTEGER  NOT NULL UNIQUE REFERENCES books(id) ON DELETE CASCADE,
+			quantity   INTEGER  NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		)`)
 	return err
 }
+
 type Book struct {
 	Id        int64
 	Title     string
@@ -70,7 +85,7 @@ func (s *BookStore) Create(b *Book) error {
 	return err
 }
 
-var ErrNotFound = errors.New("book not found")
+var BookNotFound = errors.New("book not found")
 
 func (s *BookStore) GetById(Id int64) (Book, error) {
 	var b Book
@@ -80,7 +95,7 @@ func (s *BookStore) GetById(Id int64) (Book, error) {
 	`, Id).Scan(&b.Id, &b.Title, &b.Author, &b.Pages, &b.CreatedAt, &b.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return Book{}, ErrNotFound
+		return Book{}, BookNotFound
 	}
 	return b, nil
 
@@ -89,7 +104,7 @@ func (s *BookStore) GetById(Id int64) (Book, error) {
 func (s *BookStore) List() ([]Book, error) {
 	rows, err := s.db.Query(`SELECT id, title, author, pages, created_at, updated_at FROM books`)
 	if err != nil {
-		log.Fatal("List ", err)
+		log.Println("List ", err)
 	}
 	defer rows.Close()
 	books := []Book{}
@@ -113,7 +128,7 @@ func checkFound(result sql.Result) error {
 		return err
 	}
 	if rowsAffected == 0 {
-		return ErrNotFound
+		return BookNotFound
 	}
 	return nil
 }
@@ -133,6 +148,9 @@ func (s *BookStore) Update(b *Book) error {
 
 func (s *BookStore) Delete(id int64) error {
 	result, err := s.db.Exec(`DELETE FROM books WHERE id = ?`, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return BookNotFound
+	}
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
-package main
+package handlers
 
 import (
+	"booksapi/internal/store"
 	"encoding/json"
 	"errors"
 	"log"
@@ -9,10 +10,10 @@ import (
 )
 
 type BookHandler struct {
-	store *BookStore
+	store *store.BookStore
 }
 
-func NewBookHandler(store *BookStore) *BookHandler {
+func NewBookHandler(store *store.BookStore) *BookHandler {
 	return &BookHandler{store: store}
 }
 
@@ -24,6 +25,15 @@ func writeJson(w http.ResponseWriter, status int, data any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJson(w, status, map[string]string{"error": message})
+}
+
+func parseBookId(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	bookId, err := strconv.ParseInt(r.PathValue("bookId"), 10, 64)
+	if err != nil || bookId <= 0 {
+		writeError(w, http.StatusBadRequest, "Invalid BookId")
+		return 0, false
+	}
+	return bookId, true
 }
 
 func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +48,7 @@ func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book := Book{Title: req.Title, Author: req.Author, Pages: req.Pages}
+	book := store.Book{Title: req.Title, Author: req.Author, Pages: req.Pages}
 
 	if err := h.store.Create(&book); err != nil {
 		log.Println("Save book", err)
@@ -50,16 +60,15 @@ func (h *BookHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 }
 func (h *BookHandler) Get(w http.ResponseWriter, r *http.Request) {
-	inputBookId := r.PathValue("bookId")
-	bookId, err := strconv.ParseInt(inputBookId, 10, 64)
-	if err != nil {
+	bookId, ok := parseBookId(w, r)
+	if !ok {
 		writeError(w, http.StatusBadRequest, "Invalid BookId")
 		return
 	}
 
 	found, err := h.store.GetById(bookId)
 
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.BookNotFound) {
 		writeError(w, http.StatusNotFound, "Book Not Found")
 		return
 	}
@@ -88,16 +97,15 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inputBookId := r.PathValue("bookId")
-	bookId, err := strconv.ParseInt(inputBookId, 10, 64)
-	if err != nil {
+	bookId, ok := parseBookId(w, r)
+	if !ok {
 		writeError(w, http.StatusBadRequest, "Invalid BookId")
 		return
 	}
 
 	found, err := h.store.GetById(bookId)
 
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.BookNotFound) {
 		writeError(w, http.StatusNotFound, "Book Not Found")
 		return
 	}
@@ -108,6 +116,7 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := req.Validate(); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	if req.Title != nil {
@@ -130,14 +139,18 @@ func (h *BookHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 }
 func (h *BookHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	deleteBookId := r.PathValue("bookId")
-	bookId, err := strconv.ParseInt(deleteBookId, 10, 64)
-	if err != nil {
+	bookId, ok := parseBookId(w, r)
+	if !ok {
 		writeError(w, http.StatusBadRequest, "Invalid BookId")
 		return
 	}
 
-	err = h.store.Delete(bookId)
+	err := h.store.Delete(bookId)
+
+	if errors.Is(err, store.BookNotFound) {
+		writeError(w, http.StatusNotFound, "Book Not Found")
+		return
+	}
 
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Could not delete book")
