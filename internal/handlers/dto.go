@@ -164,11 +164,12 @@ type OrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	CustomerName  string             `json:"customer_name"`
-	CustomerEmail string             `json:"customer_email"`
-	CustomerPhone string             `json:"customer_phone"`
-	Notes         string             `json:"notes"`
-	Items         []OrderItemRequest `json:"items"`
+	CustomerFirstName string             `json:"customer_name"`
+	CustomerLastName  string             `json:"customer_name"`
+	CustomerEmail     string             `json:"customer_email"`
+	CustomerPhone     string             `json:"customer_phone"`
+	Notes             string             `json:"notes"`
+	Items             []OrderItemRequest `json:"items"`
 }
 
 var phonePattern = regexp.MustCompile(`^\+?[0-9]{7,15}$`)
@@ -178,8 +179,11 @@ func normalizePhone(phone string) string {
 }
 
 func (r CreateOrderRequest) Validate() error {
-	if strings.TrimSpace(r.CustomerName) == "" {
-		return errors.New("Customer name is required")
+	if strings.TrimSpace(r.CustomerFirstName) == "" {
+		return errors.New("Customer first name is required")
+	}
+	if strings.TrimSpace(r.CustomerLastName) == "" {
+		return errors.New("Customer last name is required")
 	}
 
 	email := strings.TrimSpace(r.CustomerEmail)
@@ -225,11 +229,12 @@ func (r CreateOrderRequest) ToOrder() store.Order {
 		items = append(items, store.OrderItem{BookId: item.BookId, Quantity: item.Quantity})
 	}
 	return store.Order{
-		CustomerName:  strings.TrimSpace(r.CustomerName),
-		CustomerEmail: strings.TrimSpace(r.CustomerEmail),
-		CustomerPhone: normalizePhone(r.CustomerPhone),
-		Notes:         strings.TrimSpace(r.Notes),
-		Items:         items,
+		CustomerFirstName: strings.TrimSpace(r.CustomerFirstName),
+		CustomerLastName:  strings.TrimSpace(r.CustomerLastName),
+		CustomerEmail:     strings.TrimSpace(r.CustomerEmail),
+		CustomerPhone:     normalizePhone(r.CustomerPhone),
+		Notes:             strings.TrimSpace(r.Notes),
+		Items:             items,
 	}
 }
 
@@ -256,19 +261,20 @@ type OrderItemResponse struct {
 }
 
 type OrderResponse struct {
-	Id            int64               `json:"id"`
-	CustomerName  string              `json:"customer_name"`
-	CustomerEmail string              `json:"customer_email"`
-	CustomerPhone string              `json:"customer_phone"`
-	Notes         string              `json:"notes"`
-	Status        store.OrderStatus   `json:"status"`
-	TotalCents    int64               `json:"total_cents"`
-	PlacedAt      string              `json:"placed_at"`
-	PaidAt        *string             `json:"paid_at"`
-	DispatchedAt  *string             `json:"dispatched_at"`
-	CancelledAt   *string             `json:"cancelled_at"`
-	UpdatedAt     string              `json:"updated_at"`
-	Items         []OrderItemResponse `json:"items,omitempty"`
+	Id                int64               `json:"id"`
+	CustomerFirstName string              `json:"customer_firstname"`
+	CustomerLastName  string              `json:"customer_lastname"`
+	CustomerEmail     string              `json:"customer_email"`
+	CustomerPhone     string              `json:"customer_phone"`
+	Notes             string              `json:"notes"`
+	Status            store.OrderStatus   `json:"status"`
+	TotalCents        int64               `json:"total_cents"`
+	PlacedAt          string              `json:"placed_at"`
+	PaidAt            *string             `json:"paid_at"`
+	DispatchedAt      *string             `json:"dispatched_at"`
+	CancelledAt       *string             `json:"cancelled_at"`
+	UpdatedAt         string              `json:"updated_at"`
+	Items             []OrderItemResponse `json:"items,omitempty"`
 }
 
 func formatOptionalTime(t *time.Time) *string {
@@ -294,19 +300,20 @@ func NewOrderResponse(o store.Order) OrderResponse {
 		}
 	}
 	return OrderResponse{
-		Id:            o.Id,
-		CustomerName:  o.CustomerName,
-		CustomerEmail: o.CustomerEmail,
-		CustomerPhone: o.CustomerPhone,
-		Notes:         o.Notes,
-		Status:        o.Status,
-		TotalCents:    o.TotalCents,
-		PlacedAt:      o.PlacedAt.Format(time.RFC3339),
-		PaidAt:        formatOptionalTime(o.PaidAt),
-		DispatchedAt:  formatOptionalTime(o.DispatchedAt),
-		CancelledAt:   formatOptionalTime(o.CancelledAt),
-		UpdatedAt:     o.UpdatedAt.Format(time.RFC3339),
-		Items:         items,
+		Id:                o.Id,
+		CustomerFirstName: o.CustomerFirstName,
+		CustomerLastName:  o.CustomerLastName,
+		CustomerEmail:     o.CustomerEmail,
+		CustomerPhone:     o.CustomerPhone,
+		Notes:             o.Notes,
+		Status:            o.Status,
+		TotalCents:        o.TotalCents,
+		PlacedAt:          o.PlacedAt.Format(time.RFC3339),
+		PaidAt:            formatOptionalTime(o.PaidAt),
+		DispatchedAt:      formatOptionalTime(o.DispatchedAt),
+		CancelledAt:       formatOptionalTime(o.CancelledAt),
+		UpdatedAt:         o.UpdatedAt.Format(time.RFC3339),
+		Items:             items,
 	}
 }
 
@@ -445,4 +452,23 @@ type PesapalIPNListResponse struct {
 	IpnId       string                   `json:"ipn_id"`
 	Error       *PesapalApiErrorResponse `json:"error,omitempty"`
 	Status      string                   `json:"status"`
+}
+
+type PesapalOrderRequest struct {
+	OrderId         string                        `json:"id"`
+	Currency        string                        `json:"currency"`
+	Amount          float64                       `json:"amount"`
+	Description     string                        `json:"description"`
+	RedirectMode    string                        `json:"redirect_mode"`
+	CallbackUrl     string                        `json:"callback_url"`
+	CancellationUrl string                        `json:"cancellation_url"`
+	NotificationId  string                        `json:"notification_id"`
+	BillingAddress  PesapalCustomerBillingAddress `json:"billing_address"`
+}
+
+type PesapalCustomerBillingAddress struct {
+	PhoneNumber  string `json:"phone_number"`
+	EmailAddress string `json:"email_address"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
 }

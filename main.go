@@ -78,6 +78,9 @@ func main() {
 		cfg.PesapalConsumerKey,
 		cfg.PesapalConsumerSecret,
 		cfg.PesapalBaseURL,
+		cfg.PesapalIPNID,
+		orderStore,
+		transactionStore,
 	)
 
 	mux.HandleFunc("POST /pesapal/ipn-registration", pesapalHandler.RegisterIPN)

@@ -48,19 +48,20 @@ func (s OrderStatus) CanTransitionTo(next OrderStatus) bool {
 }
 
 type Order struct {
-	Id            int64
-	CustomerName  string
-	CustomerEmail string
-	CustomerPhone string
-	Notes         string
-	Status        OrderStatus
-	TotalCents    int64
-	PlacedAt      time.Time
-	PaidAt        *time.Time
-	DispatchedAt  *time.Time
-	CancelledAt   *time.Time
-	UpdatedAt     time.Time
-	Items         []OrderItem
+	Id                int64
+	CustomerFirstName string
+	CustomerLastName  string
+	CustomerEmail     string
+	CustomerPhone     string
+	Notes             string
+	Status            OrderStatus
+	TotalCents        int64
+	PlacedAt          time.Time
+	PaidAt            *time.Time
+	DispatchedAt      *time.Time
+	CancelledAt       *time.Time
+	UpdatedAt         time.Time
+	Items             []OrderItem
 }
 
 type OrderItem struct {
@@ -134,13 +135,13 @@ type querier interface {
 	Query(query string, args ...any) (*sql.Rows, error)
 }
 
-const orderColumns = `id, customer_name, customer_email, customer_phone, notes, status,
+const orderColumns = `id, customer_firstname ,customer_lastname, customer_email, customer_phone, notes, status,
 	total_cents, placed_at, paid_at, dispatched_at, cancelled_at, updated_at`
 
 func scanOrder(row rowScanner) (Order, error) {
 	var o Order
 	var paidAt, dispatchedAt, cancelledAt sql.NullTime
-	err := row.Scan(&o.Id, &o.CustomerName, &o.CustomerEmail, &o.CustomerPhone, &o.Notes, &o.Status,
+	err := row.Scan(&o.Id, &o.CustomerFirstName, &o.CustomerLastName, &o.CustomerEmail, &o.CustomerPhone, &o.Notes, &o.Status,
 		&o.TotalCents, &o.PlacedAt, &paidAt, &dispatchedAt, &cancelledAt, &o.UpdatedAt)
 	o.PaidAt = nullTimePtr(paidAt)
 	o.DispatchedAt = nullTimePtr(dispatchedAt)
@@ -198,10 +199,10 @@ func (s *OrderStore) Create(o *Order) error {
 	o.UpdatedAt = now
 
 	result, err := tx.Exec(`
-		INSERT INTO orders (customer_name, customer_email, customer_phone, notes, status,
+		INSERT INTO orders (customer_firstname, customer_lastname, customer_email, customer_phone, notes, status,
 		                    total_cents, placed_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		o.CustomerName, o.CustomerEmail, o.CustomerPhone, o.Notes, o.Status,
+		o.CustomerFirstName, o.CustomerLastName, o.CustomerEmail, o.CustomerPhone, o.Notes, o.Status,
 		o.TotalCents, o.PlacedAt, o.UpdatedAt,
 	)
 	if err != nil {

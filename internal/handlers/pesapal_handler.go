@@ -2,23 +2,43 @@ package handlers
 
 import (
 	"booksapi/internal/external_api"
+	"booksapi/internal/store"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
 type PesapalHandler struct {
-	client         *http.Client
-	consumerKey    string
-	consumerSecret string
-	pesapalBaseUrl string
+	client           *http.Client
+	consumerKey      string
+	consumerSecret   string
+	pesapalBaseUrl   string
+	pesapalIPNID     string
+	orderStore       *store.OrderStore
+	transactionStore *store.TransactionStore
 }
 
-func NewPesapalHandler(client *http.Client, consumerKey string, consumerSecret string, pesapalBaseUrl string) *PesapalHandler {
-	return &PesapalHandler{client: external_api.ApiClient, consumerKey: consumerKey, consumerSecret: consumerSecret, pesapalBaseUrl: pesapalBaseUrl}
+func NewPesapalHandler(client *http.Client,
+	consumerKey string,
+	consumerSecret string,
+	pesapalBaseUrl string,
+	pesapalIPNID string,
+	orderStore *store.OrderStore,
+	transactionStore *store.TransactionStore,
+) *PesapalHandler {
+	return &PesapalHandler{
+		client:           external_api.ApiClient,
+		consumerKey:      consumerKey,
+		consumerSecret:   consumerSecret,
+		pesapalBaseUrl:   pesapalBaseUrl,
+		pesapalIPNID:     pesapalIPNID,
+		orderStore:       orderStore,
+		transactionStore: transactionStore,
+	}
 }
 
 func (p *PesapalHandler) getRequestToken() (string, error) {
@@ -118,7 +138,50 @@ func (p *PesapalHandler) GetIPNList(w http.ResponseWriter, r *http.Request) {
 	writeJson(w, http.StatusOK, pesapalIPNList)
 }
 
-func (p *PesapalHandler) SubmitOrderRequest() {
+func (p *PesapalHandler) SubmitOrderRequest(w http.ResponseWriter, r *http.Request) {
+	orderId, ok := parseOrderId(w, r)
+	if !ok {
+		return
+	}
+	order, err := p.orderStore.GetById(orderId)
+	if err != nil {
+		writeJson(w, http.StatusNotFound, "Order not found")
+		return
+	}
+	var customerBillingAddress = PesapalCustomerBillingAddress{
+		PhoneNumber:  order.CustomerPhone,
+		EmailAddress: order.CustomerEmail,
+		FirstName:    order.CustomerFirstName,
+		LastName:     order.CustomerLastName,
+	}
+	var pesapalOrderRequest = PesapalOrderRequest{
+		OrderId:        strconv.Itoa(int(order.Id)),
+		Currency:       "kes",
+		Amount:         float64(order.TotalCents) / 100,
+		CallbackUrl:    "https://cheddar-dining-grimace.ngrok-free.dev/customer/ipn-notification",
+		NotificationId: p.pesapalIPNID,
+		BillingAddress: customerBillingAddress,
+	}
+	jsonPayload, err := json.Marshal(pesapalOrderRequest)
+	if err != nil {
+		writeJson(w, http.StatusBadRequest, "Invalid Json Body")
+	}
+
+	authToken, err := p.getRequestToken()
+	if err != nil || strings.TrimSpace(authToken) == "" {
+		writeError(w, http.StatusBadGateway, "Failed to authenticate with pesapal")
+		return
+	}
+	req, err := http.NewRequest(http.MethodPost, p.pesapalBaseUrl+"/Transactions/SubmitOrderRequest", bytes.NewReader(jsonPayload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+authToken)
+
+	response, err := p.client.Do(req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Failed to submit an order request to pesapal")
+		return
+	}
+	defer response.Body.Close()
 
 }
 

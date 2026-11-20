@@ -12,6 +12,7 @@ type Config struct {
 	PesapalConsumerKey    string
 	PesapalConsumerSecret string
 	PesapalBaseURL        string
+	PesapalIPNID          string
 }
 
 func Load() (Config, error) {
@@ -31,6 +32,7 @@ func Load() (Config, error) {
 		PesapalConsumerKey:    required("PESAPAL_CONSUMER_KEY"),
 		PesapalConsumerSecret: required("PESAPAL_CONSUMER_SECRET"),
 		PesapalBaseURL:        required("PESAPAL_BASE_URL"),
+		PesapalIPNID:          required("PESAPAL_IPN_ID"),
 	}
 
 	if len(missing) > 0 {
