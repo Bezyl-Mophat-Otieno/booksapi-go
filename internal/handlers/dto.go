@@ -397,7 +397,52 @@ func ToTransactionResponses(transactions []store.Transaction) []TransactionRespo
 	return responses
 }
 
+type PesapalApiErrorResponse struct {
+	Type    string `json:"type"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type IpnNotificationType string
+
+const (
+	POST IpnNotificationType = "POST"
+	GET  IpnNotificationType = "GET"
+)
+
 type PesapalAuthTokenRequest struct {
-	ConsumerKey string `json:"consumer_key"`
-	SecretKey   string `json:"secret_key"`
+	ConsumerKey    string `json:"consumer_key"`
+	ConsumerSecret string `json:"consumer_secret"`
+}
+
+type PesapalAuthTokenResponse struct {
+	Token      string                   `json:"token"`
+	ExpiryDate string                   `json:"expiryDate"`
+	Error      *PesapalApiErrorResponse `json:"error,omitempty"`
+	Status     string                   `json:"status"`
+	Message    string                   `json:"message"`
+}
+
+type PesapalIPNRegistrationRequest struct {
+	Url                 string              `json:"url"`
+	IpnNotificationType IpnNotificationType `json:"ipn_notification_type"`
+}
+
+type PesapalIPNRegistrationResponse struct {
+	Url                            string                   `json:"url"`
+	CreatedDate                    string                   `json:"created_date"`
+	IpnId                          string                   `json:"ipn_id"`
+	IpnNotificationType            string                   `json:"ipn_notification_type"`
+	IpnNotificationTypeDescription string                   `json:"ipn_notification_type_description"`
+	IpnStatus                      int                      `json:"ipn_status"`
+	IpnStatusDescription           string                   `json:"ipn_status_description"`
+	Error                          *PesapalApiErrorResponse `json:"error,omitempty"`
+	Status                         string                   `json:"status"`
+}
+
+type PesapalIPNListResponse struct {
+	CreatedDate string                   `json:"created_date"`
+	IpnId       string                   `json:"ipn_id"`
+	Error       *PesapalApiErrorResponse `json:"error,omitempty"`
+	Status      string                   `json:"status"`
 }

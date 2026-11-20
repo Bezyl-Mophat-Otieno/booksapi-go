@@ -16,14 +16,6 @@ const (
 	StatusCancelled  OrderStatus = "cancelled"
 )
 
-// allowedTransitions is the order lifecycle:
-//
-//	placed -> paid -> dispatched
-//	placed -> cancelled
-//	paid   -> cancelled
-//
-// dispatched and cancelled are final. Stock is only reduced on dispatch, and a
-// dispatched order cannot be cancelled, so cancelling never has to restock.
 var allowedTransitions = map[OrderStatus][]OrderStatus{
 	StatusPlaced:     {StatusPaid, StatusCancelled},
 	StatusPaid:       {StatusDispatched, StatusCancelled},
@@ -31,7 +23,6 @@ var allowedTransitions = map[OrderStatus][]OrderStatus{
 	StatusCancelled:  {},
 }
 
-// statusTimestampColumn is the column stamped when an order enters that status.
 var statusTimestampColumn = map[OrderStatus]string{
 	StatusPaid:       "paid_at",
 	StatusDispatched: "dispatched_at",
@@ -43,7 +34,6 @@ func (s OrderStatus) Valid() bool {
 	return ok
 }
 
-// AllowedNext returns the statuses an order in status s can move to.
 func (s OrderStatus) AllowedNext() []OrderStatus {
 	return allowedTransitions[s]
 }

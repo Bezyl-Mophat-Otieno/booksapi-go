@@ -1,11 +1,13 @@
 package main
 
 import (
+	"booksapi/internal/config"
 	"booksapi/internal/handlers"
 	"booksapi/internal/store"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -13,6 +15,11 @@ import (
 func main() {
 	mux := http.NewServeMux()
 	_ = godotenv.Load()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	db, err := store.Open("books.db")
 	if err != nil {
@@ -66,8 +73,18 @@ func main() {
 	mux.HandleFunc("GET /transactions", transactionHandler.List)
 	mux.HandleFunc("GET /transactions/{transactionId}", transactionHandler.Get)
 
-	log.Println("Server running on http://localhost:8080")
+	pesapalHandler := handlers.NewPesapalHandler(
+		&http.Client{Timeout: time.Second * 10},
+		cfg.PesapalConsumerKey,
+		cfg.PesapalConsumerSecret,
+		cfg.PesapalBaseURL,
+	)
 
+	mux.HandleFunc("POST /pesapal/ipn-registration", pesapalHandler.RegisterIPN)
+	mux.HandleFunc("GET /pesapal/ipn-notification", pesapalHandler.IPNUrlHandler)
+	mux.HandleFunc("GET /pesapal/ipn-list", pesapalHandler.GetIPNList)
+
+	log.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 
 }
