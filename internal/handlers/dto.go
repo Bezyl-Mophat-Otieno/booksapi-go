@@ -164,8 +164,8 @@ type OrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	CustomerFirstName string             `json:"customer_name"`
-	CustomerLastName  string             `json:"customer_name"`
+	CustomerFirstName string             `json:"customer_firstname"`
+	CustomerLastName  string             `json:"customer_lastname"`
 	CustomerEmail     string             `json:"customer_email"`
 	CustomerPhone     string             `json:"customer_phone"`
 	Notes             string             `json:"notes"`
@@ -331,68 +331,43 @@ type StockShortageResponse struct {
 	Available int64 `json:"available"`
 }
 
-type CreateTransactionRequest struct {
-	OrderTrackingID  string `json:"order_tracking_id"`
-	ConfirmationCode string `json:"confirmation_code"`
-	StatusCode       string `json:"status_code"`
-	PaymentMethod    string `json:"payment_method"`
-	AmountCents      int64  `json:"amount_cents"`
-	Currency         string `json:"currency"`
-}
-
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
-
-func (r CreateTransactionRequest) Validate() error {
-	if strings.TrimSpace(r.OrderTrackingID) == "" {
-		return errors.New("Order tracking id is required")
-	}
-	if strings.TrimSpace(r.StatusCode) == "" {
-		return errors.New("Status code is required")
-	}
-	if r.AmountCents < 0 {
-		return errors.New("Amount cannot be negative")
-	}
-	if !currencyPattern.MatchString(strings.ToUpper(strings.TrimSpace(r.Currency))) {
-		return errors.New("Currency must be a 3-letter code such as KES")
-	}
-	return nil
-}
-
-func (r CreateTransactionRequest) ToTransaction(orderId int64) store.Transaction {
-	return store.Transaction{
-		OrderID:          orderId,
-		OrderTrackingID:  strings.TrimSpace(r.OrderTrackingID),
-		ConfirmationCode: strings.TrimSpace(r.ConfirmationCode),
-		StatusCode:       strings.TrimSpace(r.StatusCode),
-		PaymentMethod:    strings.TrimSpace(r.PaymentMethod),
-		AmountCents:      r.AmountCents,
-		Currency:         strings.ToUpper(strings.TrimSpace(r.Currency)),
-	}
-}
-
 type TransactionResponse struct {
-	Id               int64  `json:"id"`
-	OrderID          int64  `json:"order_id"`
-	OrderTrackingID  string `json:"order_tracking_id"`
-	ConfirmationCode string `json:"confirmation_code"`
-	StatusCode       string `json:"status_code"`
-	PaymentMethod    string `json:"payment_method"`
-	AmountCents      int64  `json:"amount_cents"`
-	Currency         string `json:"currency"`
-	CreatedAt        string `json:"created_at"`
+	Id                       int64   `json:"id"`
+	OrderID                  int64   `json:"order_id"`
+	MerchantReference        string  `json:"merchant_reference"`
+	OrderTrackingID          string  `json:"order_tracking_id"`
+	Status                   string  `json:"status"`
+	StatusCode               *int64  `json:"status_code"`
+	PaymentStatusDescription *string `json:"payment_status_description"`
+	ConfirmationCode         *string `json:"confirmation_code"`
+	PaymentMethod            *string `json:"payment_method"`
+	PaymentAccount           *string `json:"payment_account"`
+	AmountCents              int64   `json:"amount_cents"`
+	Currency                 string  `json:"currency"`
+	PaidAmountCents          *int64  `json:"paid_amount_cents"`
+	PaidCurrency             *string `json:"paid_currency"`
+	CreatedAt                string  `json:"created_at"`
+	UpdatedAt                string  `json:"updated_at"`
 }
 
 func NewTransactionResponse(t store.Transaction) TransactionResponse {
 	return TransactionResponse{
-		Id:               t.Id,
-		OrderID:          t.OrderID,
-		OrderTrackingID:  t.OrderTrackingID,
-		ConfirmationCode: t.ConfirmationCode,
-		StatusCode:       t.StatusCode,
-		PaymentMethod:    t.PaymentMethod,
-		AmountCents:      t.AmountCents,
-		Currency:         t.Currency,
-		CreatedAt:        t.CreatedAt.Format(time.RFC3339),
+		Id:                       t.Id,
+		OrderID:                  t.OrderID,
+		MerchantReference:        t.MerchantReference,
+		OrderTrackingID:          t.OrderTrackingID,
+		Status:                   string(t.Status),
+		StatusCode:               t.StatusCode,
+		PaymentStatusDescription: t.PaymentStatusDescription,
+		ConfirmationCode:         t.ConfirmationCode,
+		PaymentMethod:            t.PaymentMethod,
+		PaymentAccount:           t.PaymentAccount,
+		AmountCents:              t.AmountCents,
+		Currency:                 t.Currency,
+		PaidAmountCents:          t.PaidAmountCents,
+		PaidCurrency:             t.PaidCurrency,
+		CreatedAt:                t.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:                t.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -408,6 +383,10 @@ type PesapalApiErrorResponse struct {
 	Type    string `json:"type"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+func (e *PesapalApiErrorResponse) present() bool {
+	return e != nil && (e.Code != "" || e.Message != "" || e.Type != "")
 }
 
 type IpnNotificationType string
@@ -454,14 +433,14 @@ type PesapalIPNListResponse struct {
 	Status      string                   `json:"status"`
 }
 
-type PesapalOrderRequest struct {
+type PesapalOrderCreationRequest struct {
 	OrderId         string                        `json:"id"`
 	Currency        string                        `json:"currency"`
 	Amount          float64                       `json:"amount"`
 	Description     string                        `json:"description"`
-	RedirectMode    string                        `json:"redirect_mode"`
+	RedirectMode    string                        `json:"redirect_mode,omitempty"`
 	CallbackUrl     string                        `json:"callback_url"`
-	CancellationUrl string                        `json:"cancellation_url"`
+	CancellationUrl string                        `json:"cancellation_url,omitempty"`
 	NotificationId  string                        `json:"notification_id"`
 	BillingAddress  PesapalCustomerBillingAddress `json:"billing_address"`
 }
@@ -471,4 +450,22 @@ type PesapalCustomerBillingAddress struct {
 	EmailAddress string `json:"email_address"`
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
+}
+
+type PesapalOrderCreationResponse struct {
+	OrderTrackingID   string                   `json:"order_tracking_id"`
+	MerchantReference string                   `json:"merchant_reference"`
+	RedirectUrl       string                   `json:"redirect_url"`
+	Error             *PesapalApiErrorResponse `json:"error,omitempty"`
+	Status            string                   `json:"status"`
+	Message           string                   `json:"message"`
+}
+
+type PaymentRequestResponse struct {
+	TransactionID     int64  `json:"transaction_id"`
+	OrderID           int64  `json:"order_id"`
+	MerchantReference string `json:"merchant_reference"`
+	OrderTrackingID   string `json:"order_tracking_id"`
+	RedirectUrl       string `json:"redirect_url"`
+	Status            string `json:"status"`
 }

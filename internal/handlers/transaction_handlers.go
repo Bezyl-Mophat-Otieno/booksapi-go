@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"booksapi/internal/store"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -36,31 +35,6 @@ func writeTransactionError(w http.ResponseWriter, err error, action string) {
 		log.Println(action, err)
 		writeError(w, http.StatusInternalServerError, "Could not "+action)
 	}
-}
-
-func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	orderId, ok := parseOrderId(w, r)
-	if !ok {
-		return
-	}
-
-	var req CreateTransactionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid Json Body")
-		return
-	}
-	if err := req.Validate(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	transaction := req.ToTransaction(orderId)
-	if err := h.store.Create(&transaction); err != nil {
-		writeTransactionError(w, err, "create transaction")
-		return
-	}
-
-	writeJson(w, http.StatusCreated, NewTransactionResponse(transaction))
 }
 
 func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {

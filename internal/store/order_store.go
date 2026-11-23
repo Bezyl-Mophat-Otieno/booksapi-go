@@ -201,7 +201,7 @@ func (s *OrderStore) Create(o *Order) error {
 	result, err := tx.Exec(`
 		INSERT INTO orders (customer_firstname, customer_lastname, customer_email, customer_phone, notes, status,
 		                    total_cents, placed_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		o.CustomerFirstName, o.CustomerLastName, o.CustomerEmail, o.CustomerPhone, o.Notes, o.Status,
 		o.TotalCents, o.PlacedAt, o.UpdatedAt,
 	)

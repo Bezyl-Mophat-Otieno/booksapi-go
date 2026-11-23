@@ -6,16 +6,34 @@ import (
 	"time"
 )
 
+type TransactionStatus string
+
+const (
+	TransactionPending   TransactionStatus = "pending"
+	TransactionCompleted TransactionStatus = "completed"
+	TransactionFailed    TransactionStatus = "failed"
+	TransactionReversed  TransactionStatus = "reversed"
+	TransactionInvalid   TransactionStatus = "invalid"
+)
+
+
 type Transaction struct {
-	Id               int64     `json:"id"`
-	OrderID          int64     `json:"order_id"`
-	OrderTrackingID  string    `json:"order_tracking_id"`
-	ConfirmationCode string    `json:"confirmation_code"`
-	StatusCode       string    `json:"status_code"`
-	PaymentMethod    string    `json:"payment_method"`
-	AmountCents      int64     `json:"amount_cents"`
-	Currency         string    `json:"currency"`
-	CreatedAt        time.Time `json:"created_at"`
+	Id                       int64
+	OrderID                  int64
+	MerchantReference        string
+	OrderTrackingID          string
+	Status                   TransactionStatus
+	StatusCode               *int64
+	PaymentStatusDescription *string
+	ConfirmationCode         *string
+	PaymentMethod            *string
+	PaymentAccount           *string
+	AmountCents              int64
+	Currency                 string
+	PaidAmountCents          *int64
+	PaidCurrency             *string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 var ErrTransactionNotFound = errors.New("transaction not found")
@@ -28,13 +46,15 @@ func NewTransactionStore(db *sql.DB) *TransactionStore {
 	return &TransactionStore{db: db}
 }
 
-const transactionColumns = `id, order_id, order_tracking_id, confirmation_code, status_code,
-	payment_method, amount_cents, currency, created_at`
+const transactionColumns = `id, order_id, merchant_reference, order_tracking_id, status, status_code,
+	payment_status_description, confirmation_code, payment_method, payment_account,
+	amount_cents, currency, paid_amount_cents, paid_currency, created_at, updated_at`
 
 func scanTransaction(row rowScanner) (Transaction, error) {
 	var t Transaction
-	err := row.Scan(&t.Id, &t.OrderID, &t.OrderTrackingID, &t.ConfirmationCode, &t.StatusCode,
-		&t.PaymentMethod, &t.AmountCents, &t.Currency, &t.CreatedAt)
+	err := row.Scan(&t.Id, &t.OrderID, &t.MerchantReference, &t.OrderTrackingID, &t.Status, &t.StatusCode,
+		&t.PaymentStatusDescription, &t.ConfirmationCode, &t.PaymentMethod, &t.PaymentAccount,
+		&t.AmountCents, &t.Currency, &t.PaidAmountCents, &t.PaidCurrency, &t.CreatedAt, &t.UpdatedAt)
 	return t, err
 }
 
@@ -72,13 +92,19 @@ func (s *TransactionStore) Create(t *Transaction) error {
 		return ErrOrderNotFound
 	}
 
+	if t.Status == "" {
+		t.Status = TransactionPending
+	}
 	t.CreatedAt = time.Now().UTC()
+	t.UpdatedAt = t.CreatedAt
 	result, err := tx.Exec(`
-		INSERT INTO transactions (order_id, order_tracking_id, confirmation_code, status_code,
-		                          payment_method, amount_cents, currency, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.OrderID, t.OrderTrackingID, t.ConfirmationCode, t.StatusCode,
-		t.PaymentMethod, t.AmountCents, t.Currency, t.CreatedAt,
+		INSERT INTO transactions (order_id, merchant_reference, order_tracking_id, status, status_code,
+		                          payment_status_description, confirmation_code, payment_method, payment_account,
+		                          amount_cents, currency, paid_amount_cents, paid_currency, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.OrderID, t.MerchantReference, t.OrderTrackingID, t.Status, t.StatusCode,
+		t.PaymentStatusDescription, t.ConfirmationCode, t.PaymentMethod, t.PaymentAccount,
+		t.AmountCents, t.Currency, t.PaidAmountCents, t.PaidCurrency, t.CreatedAt, t.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -88,6 +114,12 @@ func (s *TransactionStore) Create(t *Transaction) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *TransactionStore) CountByOrder(orderId int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE order_id = ?`, orderId).Scan(&count)
+	return count, err
 }
 
 func (s *TransactionStore) GetById(id int64) (Transaction, error) {

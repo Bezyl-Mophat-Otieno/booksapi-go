@@ -68,7 +68,6 @@ func main() {
 	transactionStore := store.NewTransactionStore(db)
 	transactionHandler := handlers.NewTransactionHandler(transactionStore)
 
-	mux.HandleFunc("POST /orders/{orderId}/transactions", transactionHandler.Create)
 	mux.HandleFunc("GET /orders/{orderId}/transactions", transactionHandler.ListByOrder)
 	mux.HandleFunc("GET /transactions", transactionHandler.List)
 	mux.HandleFunc("GET /transactions/{transactionId}", transactionHandler.Get)
@@ -79,6 +78,7 @@ func main() {
 		cfg.PesapalConsumerSecret,
 		cfg.PesapalBaseURL,
 		cfg.PesapalIPNID,
+		cfg.PesapalCallbackURL,
 		orderStore,
 		transactionStore,
 	)
@@ -86,6 +86,7 @@ func main() {
 	mux.HandleFunc("POST /pesapal/ipn-registration", pesapalHandler.RegisterIPN)
 	mux.HandleFunc("GET /pesapal/ipn-notification", pesapalHandler.IPNUrlHandler)
 	mux.HandleFunc("GET /pesapal/ipn-list", pesapalHandler.GetIPNList)
+	mux.HandleFunc("POST /orders/{orderId}/payment-request", pesapalHandler.SubmitOrderRequest)
 
 	log.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
