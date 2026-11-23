@@ -85,6 +85,7 @@ func main() {
 
 	mux.HandleFunc("POST /pesapal/ipn-registration", pesapalHandler.RegisterIPN)
 	mux.HandleFunc("GET /pesapal/ipn-notification", pesapalHandler.IPNUrlHandler)
+	mux.HandleFunc("GET /pesapal/transaction-status", pesapalHandler.GetTransactionStatus)
 	mux.HandleFunc("GET /pesapal/ipn-list", pesapalHandler.GetIPNList)
 	mux.HandleFunc("POST /orders/{orderId}/payment-request", pesapalHandler.SubmitOrderRequest)
 

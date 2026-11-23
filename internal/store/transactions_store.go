@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -15,7 +16,6 @@ const (
 	TransactionReversed  TransactionStatus = "reversed"
 	TransactionInvalid   TransactionStatus = "invalid"
 )
-
 
 type Transaction struct {
 	Id                       int64
@@ -164,4 +164,138 @@ func (s *TransactionStore) ListByOrder(orderId int64) ([]Transaction, error) {
 		return nil, err
 	}
 	return scanTransactions(rows)
+}
+
+var ErrStaleTransactionStatus = errors.New("transaction is already in a final state")
+
+func (s TransactionStatus) canMoveTo(next TransactionStatus) bool {
+	switch s {
+	case TransactionCompleted:
+		return next == TransactionCompleted || next == TransactionReversed
+	case TransactionReversed:
+		return next == TransactionReversed
+	default:
+		return true
+	}
+}
+
+type TransactionStatusUpdate struct {
+	Status                   TransactionStatus
+	StatusCode               *int64
+	PaymentStatusDescription *string
+	ConfirmationCode         *string
+	PaymentMethod            *string
+	PaymentAccount           *string
+	PaidAmountCents          *int64
+	PaidCurrency             *string
+}
+
+type TransactionStatusUpdateResult struct {
+	Transaction     Transaction
+	Changed         bool
+	OrderMarkedPaid bool
+	AmountMismatch  bool
+	OrderStatus     OrderStatus
+}
+
+func (s *TransactionStore) GetByReferences(trackingId, merchantReference string) (Transaction, error) {
+	return getTransactionByReferences(s.db, trackingId, merchantReference)
+}
+
+func getTransactionByReferences(q queryRower, trackingId, merchantReference string) (Transaction, error) {
+	t, err := scanTransaction(q.QueryRow(
+		`SELECT `+transactionColumns+` FROM transactions WHERE order_tracking_id = ? AND merchant_reference = ?`,
+		trackingId, merchantReference))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, ErrTransactionNotFound
+	}
+	return t, err
+}
+func (s *TransactionStore) ApplyStatusUpdate(trackingId, merchantReference string, u TransactionStatusUpdate) (TransactionStatusUpdateResult, error) {
+	var result TransactionStatusUpdateResult
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback()
+
+	current, err := getTransactionByReferences(tx, trackingId, merchantReference)
+	if err != nil {
+		return result, err
+	}
+	result.Transaction = current
+
+	if !current.Status.canMoveTo(u.Status) {
+		return result, ErrStaleTransactionStatus
+	}
+
+	result.Changed = current.Status != u.Status ||
+		!equalPtr(current.StatusCode, u.StatusCode) ||
+		!equalPtr(current.PaymentStatusDescription, u.PaymentStatusDescription) ||
+		!equalPtr(current.ConfirmationCode, u.ConfirmationCode) ||
+		!equalPtr(current.PaymentMethod, u.PaymentMethod) ||
+		!equalPtr(current.PaymentAccount, u.PaymentAccount) ||
+		!equalPtr(current.PaidAmountCents, u.PaidAmountCents) ||
+		!equalPtr(current.PaidCurrency, u.PaidCurrency)
+
+	now := time.Now().UTC()
+	if result.Changed {
+		_, err = tx.Exec(`
+			UPDATE transactions
+			SET status = ?, status_code = ?, payment_status_description = ?, confirmation_code = ?,
+			    payment_method = ?, payment_account = ?, paid_amount_cents = ?, paid_currency = ?,
+			    updated_at = ?
+			WHERE id = ?`,
+			u.Status, u.StatusCode, u.PaymentStatusDescription, u.ConfirmationCode,
+			u.PaymentMethod, u.PaymentAccount, u.PaidAmountCents, u.PaidCurrency,
+			now, current.Id,
+		)
+		if err != nil {
+			return result, err
+		}
+		result.Transaction.Status = u.Status
+		result.Transaction.StatusCode = u.StatusCode
+		result.Transaction.PaymentStatusDescription = u.PaymentStatusDescription
+		result.Transaction.ConfirmationCode = u.ConfirmationCode
+		result.Transaction.PaymentMethod = u.PaymentMethod
+		result.Transaction.PaymentAccount = u.PaymentAccount
+		result.Transaction.PaidAmountCents = u.PaidAmountCents
+		result.Transaction.PaidCurrency = u.PaidCurrency
+		result.Transaction.UpdatedAt = now
+	}
+
+	if u.Status == TransactionCompleted {
+		covered := u.PaidAmountCents != nil && *u.PaidAmountCents >= current.AmountCents &&
+			u.PaidCurrency != nil && strings.EqualFold(*u.PaidCurrency, current.Currency)
+		if !covered {
+			result.AmountMismatch = true
+		} else {
+			res, err := tx.Exec(
+				`UPDATE orders SET status = ?, paid_at = ?, updated_at = ? WHERE id = ? AND status = ?`,
+				StatusPaid, now, now, current.OrderID, StatusPlaced,
+			)
+			if err != nil {
+				return result, err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return result, err
+			}
+			result.OrderMarkedPaid = n == 1
+		}
+	}
+
+	if err := tx.QueryRow(`SELECT status FROM orders WHERE id = ?`, current.OrderID).Scan(&result.OrderStatus); err != nil {
+		return result, err
+	}
+
+	return result, tx.Commit()
+}
+
+func equalPtr[T comparable](a, b *T) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }

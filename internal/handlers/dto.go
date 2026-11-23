@@ -469,3 +469,33 @@ type PaymentRequestResponse struct {
 	RedirectUrl       string `json:"redirect_url"`
 	Status            string `json:"status"`
 }
+
+type PesapalIPNNotification struct {
+	OrderTrackingId        string `json:"OrderTrackingId"`
+	OrderMerchantReference string `json:"OrderMerchantReference"`
+	OrderNotificationType  string `json:"OrderNotificationType"`
+}
+
+type PesapalIPNAcknowledgement struct {
+	OrderNotificationType  string `json:"orderNotificationType"`
+	OrderTrackingId        string `json:"orderTrackingId"`
+	OrderMerchantReference string `json:"orderMerchantReference"`
+	Status                 int    `json:"status"`
+}
+
+type PesapalTransactionStatusResponse struct {
+	PaymentMethod            string                   `json:"payment_method"`
+	Amount                   float64                  `json:"amount"`
+	CreatedDate              string                   `json:"created_date"`
+	ConfirmationCode         string                   `json:"confirmation_code"`
+	PaymentStatusDescription string                   `json:"payment_status_description"`
+	Description              string                   `json:"description"`
+	Message                  string                   `json:"message"`
+	PaymentAccount           string                   `json:"payment_account"`
+	CallBackUrl              string                   `json:"call_back_url"`
+	StatusCode               *int64                   `json:"status_code"`
+	MerchantReference        string                   `json:"merchant_reference"`
+	Currency                 string                   `json:"currency"`
+	Error                    *PesapalApiErrorResponse `json:"error,omitempty"`
+	Status                   string                   `json:"status"`
+}
