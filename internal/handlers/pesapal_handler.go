@@ -255,7 +255,7 @@ func (p *PesapalHandler) SubmitOrderRequest(w http.ResponseWriter, r *http.Reque
 }
 
 func (p *PesapalHandler) GetTransactionStatus(w http.ResponseWriter, r *http.Request) {
-	orderTrackingId := r.URL.Query().Get("OrderTrackingId")
+	orderTrackingId := strings.TrimSpace(r.URL.Query().Get("OrderTrackingId"))
 	if orderTrackingId == "" {
 		writeError(w, http.StatusBadRequest, "OrderTrackingId is required")
 		return
@@ -340,23 +340,25 @@ func nilIfBlank(s string) *string {
 	return &s
 }
 
-func (p *PesapalHandler) syncTransactionStatus(trackingId, merchantReference string) (store.TransactionStatusUpdateResult, error) {
+func (p *PesapalHandler) syncTransactionStatus(trackingId, merchantReference string) (PesapalTransactionStatusResponse, store.TransactionStatusUpdateResult, error) {
+	var status PesapalTransactionStatusResponse
 
 	if _, err := p.transactionStore.GetByReferences(trackingId, merchantReference); err != nil {
-		return store.TransactionStatusUpdateResult{}, err
+		return status, store.TransactionStatusUpdateResult{}, err
 	}
 
 	status, err := p.fetchTransactionStatus(trackingId)
 	if err != nil {
-		return store.TransactionStatusUpdateResult{}, err
+		return status, store.TransactionStatusUpdateResult{}, err
 	}
 	if status.MerchantReference != "" && status.MerchantReference != merchantReference {
-		return store.TransactionStatusUpdateResult{}, fmt.Errorf(
+		return status, store.TransactionStatusUpdateResult{}, fmt.Errorf(
 			"pesapal reports merchant reference %q for tracking id %s, expected %q",
 			status.MerchantReference, trackingId, merchantReference)
 	}
 
-	return p.transactionStore.ApplyStatusUpdate(trackingId, merchantReference, toStatusUpdate(status))
+	result, err := p.transactionStore.ApplyStatusUpdate(trackingId, merchantReference, toStatusUpdate(status))
+	return status, result, err
 }
 
 func (p *PesapalHandler) IPNUrlHandler(w http.ResponseWriter, r *http.Request) {
@@ -391,7 +393,7 @@ func (p *PesapalHandler) IPNUrlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := p.syncTransactionStatus(notification.OrderTrackingId, notification.OrderMerchantReference)
+	_, result, err := p.syncTransactionStatus(notification.OrderTrackingId, notification.OrderMerchantReference)
 	switch {
 	case errors.Is(err, store.ErrStaleTransactionStatus):
 		log.Printf("ipn: ignored out-of-order update for %s/%s: transaction is %s",

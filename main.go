@@ -4,6 +4,7 @@ import (
 	"booksapi/internal/config"
 	"booksapi/internal/handlers"
 	"booksapi/internal/store"
+	"booksapi/web"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -88,6 +89,7 @@ func main() {
 	mux.HandleFunc("GET /pesapal/transaction-status", pesapalHandler.GetTransactionStatus)
 	mux.HandleFunc("GET /pesapal/ipn-list", pesapalHandler.GetIPNList)
 	mux.HandleFunc("POST /orders/{orderId}/payment-request", pesapalHandler.SubmitOrderRequest)
+	mux.Handle("GET /", http.FileServerFS(web.Files))
 
 	log.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))

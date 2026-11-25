@@ -499,3 +499,10 @@ type PesapalTransactionStatusResponse struct {
 	Error                    *PesapalApiErrorResponse `json:"error,omitempty"`
 	Status                   string                   `json:"status"`
 }
+
+
+type TransactionStatusCheckResponse struct {
+	PesapalTransactionStatusResponse
+	Transaction *TransactionResponse `json:"transaction,omitempty"`
+	OrderStatus string               `json:"order_status,omitempty"`
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orders</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1>Orders</h1>
+        <p class="subtitle">Pay for placed orders with Pesapal.</p>
+      </div>
+      <button type="button" id="refresh-orders" class="button button-secondary">Refresh</button>
+    </header>
+
+    <section id="payment-result" class="notice" hidden aria-live="polite"></section>
+
+    <section id="payment-panel" class="panel" hidden>
+      <div class="panel-header">
+        <h2 id="payment-title">Payment</h2>
+        <button type="button" id="close-payment" class="button button-secondary">Close</button>
+      </div>
+      <iframe id="payment-frame" title="Pesapal payment" allow="payment"></iframe>
+    </section>
+
+    <section class="panel">
+      <p id="orders-message" class="muted">Loading orders…</p>
+      <div class="table-wrap">
+        <table id="orders-table" hidden>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Customer</th>
+              <th class="num">Total</th>
+              <th>Status</th>
+              <th>Placed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="orders-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>
